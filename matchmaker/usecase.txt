@@ -3,45 +3,91 @@
 left to right direction
 skinparam packageStyle rectangle
 
+' Actors
 actor Attendee
-actor Event_Creator
+actor LFG_Post_Creator
+LFG_Post_Creator -down-|> Attendee
 
 rectangle "Data Interface" {
-actor Attendee_Store
-actor Event_Store
+	actor Attendee_Store
+	actor Attendee_Preferences_Store
+	actor LFG_Post_Store
 }
 
+
+' Use cases
 rectangle "User Interface" {
 	' Attendee interactions
-	Attendee --> (Modify attendance)
+	rectangle "Find Groups" {
+		Attendee --> (Find group)
+		Attendee --> (Join group)
+		Attendee --> (Leave group)
+	}
+	rectangle "Modify Preferences" {
+		Attendee --> (Modify quiet hours)
+		Attendee --> (Change notification preferences)
+		Attendee --> (Block user)
+	}
+
 	(Notification) --> Attendee
 
-	' Event_Creator interactions
-	Event_Creator --> (Modify event)
+	' LFG_Post_Creator interactions
+	rectangle "Manage Group" {
+		LFG_Post_Creator --> (Post new LFG)
+		LFG_Post_Creator --> (Remove post)
+		LFG_Post_Creator --> (Change post info)
+	}
 }
-
 rectangle Application {
 	' Attendee interactions
-	(Add subscriber) << Service >>
-	(Modify attendance) --> (Add subscriber)
-	(Remove subscriber) << Service >>
-	(Modify attendance) --> (Remove subscriber)
-	(Add subscriber) --> Attendee_Store
-	(Remove subscriber) --> Attendee_Store
-	(Event publisher) << Daemon >>
-	(Event publisher) --> (Notification)
-	(Event publisher) <--> Event_Store
+	(Filter groups) << Service >>
+	(Find group) --> (Filter groups)
+	(Filter groups) <-- LFG_Post_Store
 
-	' Event_Creator interactions
-	(Add event) << Service >>
-	(Modify event) --> (Add event)
-	(Remove event) << Service >>
-	(Modify event) --> (Remove event)
-	(Update event) << Service >>
-	(Modify event) --> (Update event)
-	(Add event) --> Event_Store
-	(Remove event) --> Event_Store
-	(Update event) --> Event_Store
+	(Add subscriber to event) << Service >>
+	(Join group) --> (Add subscriber to event)
+	(Add subscriber to event) <-> Attendee_Store
+
+	(Remove subscriber from event) << Service >>
+	(Leave group) --> (Remove subscriber from event)
+	(Remove subscriber from event) --> Attendee_Store
+
+	(Modify quiet hours) --> (Update preferences)
+	(Block user) --> (Update preferences)
+	(Change notification preferences) -> (Update preferences)
+	(Update preferences) << Service >>
+	(Update preferences) --> Attendee_Preferences_Store
+
+	' Event notifications
+	(Notification publisher) << Service >>
+	(Notification publisher) --> (Notification)
+	(Notification publisher) <-- Attendee_Preferences_Store
+	(Notification publisher) <-- LFG_Post_Store
+	(Notification publisher) .>(Enumerate subscribed users)
+
+	(Event alarm) << Daemon >>
+	(Event alarm) --> (Notification publisher)
+
+	(Enumerate subscribed users) << Service >>
+	(Enumerate subscribed users) <-- Attendee_Store
+
+
+	' LFG_Post_Creator interactions
+	(Create LFG post) << Service >>
+	(Post new LFG) --> (Create LFG post)
+	(Create LFG post) <-> LFG_Post_Store
+
+	(Delete LFG post) << Service >>
+	(Remove post) --> (Delete LFG post)
+	(Delete LFG post) --> LFG_Post_Store
+	(Delete LFG post) .> (Enumerate subscribed users)
+	(Delete LFG post) --> (Notification publisher)
+
+	(Change LFG post) << Service >>
+	(Change post info) --> (Change LFG post)
+	(Change LFG post) <--> LFG_Post_Store
+	(Change LFG post) .> (Enumerate subscribed users)
+	(Change LFG post) --> (Notification publisher)
 }
 
 @enduml
