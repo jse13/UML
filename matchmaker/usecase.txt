@@ -1,93 +1,128 @@
 @startuml
-
 left to right direction
 skinparam packageStyle rectangle
 
-' Actors
-actor Attendee
-actor LFG_Post_Creator
-LFG_Post_Creator -down-|> Attendee
+'----------------------------------------------------------------------
+:Attendee: as attendee_find_groups
 
-rectangle "Data Interface" {
-	actor Attendee_Store
-	actor Attendee_Preferences_Store
-	actor LFG_Post_Store
+rectangle "Data Interface" as finding_group_data_interface {
+	:LFG Post Store: as finding_group_post_store
+	:Attendee Store: as finding_group_attendee_store
 }
 
-
-' Use cases
-rectangle "User Interface" {
-	' Attendee interactions
+rectangle "User Interface" as finding_group_UI {
 	rectangle "Find Groups" {
-		Attendee --> (Find group)
-		Attendee --> (Join group)
-		Attendee --> (Leave group)
-	}
-	rectangle "Modify Preferences" {
-		Attendee --> (Modify quiet hours)
-		Attendee --> (Change notification preferences)
-		Attendee --> (Block user)
-	}
-
-	(Notification) --> Attendee
-
-	' LFG_Post_Creator interactions
-	rectangle "Manage Group" {
-		LFG_Post_Creator --> (Post new LFG)
-		LFG_Post_Creator --> (Remove post)
-		LFG_Post_Creator --> (Change post info)
+		attendee_find_groups --> (Find group)
+		attendee_find_groups --> (Join group)
+		attendee_find_groups --> (Leave group)
 	}
 }
-rectangle Application {
-	' Attendee interactions
-	(Filter groups) << Service >>
-	(Find group) --> (Filter groups)
-	(Filter groups) <-- LFG_Post_Store
+
+rectangle "Application" as finding_group_application {
+	(Filter groups) << Service >> as finding_group_filter_groups
+	(Find group) --> (finding_group_filter_groups)
+	(finding_group_filter_groups) <-- finding_group_post_store
 
 	(Add subscriber to event) << Service >>
 	(Join group) --> (Add subscriber to event)
-	(Add subscriber to event) <-> Attendee_Store
+	(Add subscriber to event) <-> finding_group_attendee_store
 
 	(Remove subscriber from event) << Service >>
 	(Leave group) --> (Remove subscriber from event)
-	(Remove subscriber from event) --> Attendee_Store
+	(Remove subscriber from event) --> finding_group_attendee_store
 
+}
+
+'----------------------------------------------------------------------
+:Attendee: as attendee_modify_preferences
+
+rectangle "Data Interface" as modify_preferences_data_interface {
+	:Attendee Preferences Store: as modify_preferences_attendee_preferences_store
+}
+
+rectangle "User Interface" as modify_preferences_UI {
+	rectangle "Modify Preferences" {
+		attendee_modify_preferences --> (Modify quiet hours)
+		attendee_modify_preferences --> (Change notification preferences)
+		attendee_modify_preferences --> (Block user)
+	}
+}
+
+rectangle "Application" as modify_preferences_application {
 	(Modify quiet hours) --> (Update preferences)
 	(Block user) --> (Update preferences)
 	(Change notification preferences) -> (Update preferences)
 	(Update preferences) << Service >>
-	(Update preferences) --> Attendee_Preferences_Store
+	(Update preferences) --> modify_preferences_attendee_preferences_store
 
-	' Event notifications
-	(Notification publisher) << Service >>
-	(Notification publisher) --> (Notification)
-	(Notification publisher) <-- Attendee_Preferences_Store
-	(Notification publisher) <-- LFG_Post_Store
-	(Notification publisher) .>(Enumerate subscribed users)
+}
 
-	(Event alarm) << Daemon >>
-	(Event alarm) --> (Notification publisher)
+'----------------------------------------------------------------------
+:LFG Post Creator: as post_creator
+:Attendee: as manage_group_attendee
 
-	(Enumerate subscribed users) << Service >>
-	(Enumerate subscribed users) <-- Attendee_Store
+rectangle "Data Interface" as manage_group_data_interface {
+	:LFG Post Store: as manage_group_LFG_post_store
+	:Attendee Store: as manage_group_attendee_store
+	:Attendee Preferences Store: as manage_group_attendee_preferences_store
+}
 
+rectangle "User Interface" as manage_group_UI {
+	rectangle "Manage Group" {
+		post_creator --> (Post new LFG)
+		post_creator --> (Remove post)
+		post_creator --> (Change post info)
+	}
+	(Notification) as manage_group_notification
+	manage_group_notification -> manage_group_attendee
+}
 
-	' LFG_Post_Creator interactions
+rectangle "Application" as manage_group_application {
 	(Create LFG post) << Service >>
 	(Post new LFG) --> (Create LFG post)
-	(Create LFG post) <-> LFG_Post_Store
+	(Create LFG post) <-> manage_group_LFG_post_store
 
 	(Delete LFG post) << Service >>
 	(Remove post) --> (Delete LFG post)
-	(Delete LFG post) --> LFG_Post_Store
-	(Delete LFG post) .> (Enumerate subscribed users)
-	(Delete LFG post) --> (Notification publisher)
+	(Delete LFG post) --> manage_group_LFG_post_store
+	(Enumerate subscribed users) << Service >> as manage_group_enumerate_subscribed_users
+	(Delete LFG post) .> (manage_group_enumerate_subscribed_users)
+	(Notification publisher) << Service >> as manage_group_notification_publisher
+	(Delete LFG post) --> (manage_group_notification_publisher)
+	(manage_group_notification_publisher) <-- manage_group_attendee_store
+	(manage_group_notification_publisher) <-- manage_group_attendee_preferences_store
+	(manage_group_notification_publisher) --> manage_group_notification
 
 	(Change LFG post) << Service >>
 	(Change post info) --> (Change LFG post)
-	(Change LFG post) <--> LFG_Post_Store
-	(Change LFG post) .> (Enumerate subscribed users)
-	(Change LFG post) --> (Notification publisher)
+	(Change LFG post) <--> manage_group_LFG_post_store
+	(Change LFG post) .> (manage_group_enumerate_subscribed_users)
+	(Change LFG post) --> (manage_group_notification_publisher)
+
+	(manage_group_enumerate_subscribed_users) <-- manage_group_attendee_store
+}
+
+'----------------------------------------------------------------------
+:Attendee: as event_alarm_attendee
+:Event Alarm: << Daemon >>
+
+rectangle "Data Interface" as event_alarm_data_interface {
+	:Attendee Store: as event_alarm_attendee_store
+	:Attendee Preferences Store: as event_alarm_attendee_preferences_store
+}
+
+rectangle "User Interface" as event_alarm_UI {
+	(Notification) as event_alarm_notification
+	event_alarm_notification -> event_alarm_attendee
+}
+
+rectangle "Application" as event_alarm_application {
+	(Notification publisher) << Service >> as event_alarm_notification_publisher
+	event_alarm_notification_publisher --> event_alarm_attendee_store
+	event_alarm_notification_publisher --> event_alarm_attendee_preferences_store
+
+	:Event Alarm: --> event_alarm_notification_publisher
+	event_alarm_notification_publisher --> event_alarm_notification
 }
 
 @enduml
