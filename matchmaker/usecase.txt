@@ -1,0 +1,47 @@
+@startuml
+
+left to right direction
+skinparam packageStyle rectangle
+
+actor Attendee
+actor Event_Creator
+
+rectangle "Data Interface" {
+actor Attendee_Store
+actor Event_Store
+}
+
+rectangle "User Interface" {
+	' Attendee interactions
+	Attendee --> (Modify attendance)
+	(Notification) --> Attendee
+
+	' Event_Creator interactions
+	Event_Creator --> (Modify event)
+}
+
+rectangle Application {
+	' Attendee interactions
+	(Add subscriber) << Service >>
+	(Modify attendance) --> (Add subscriber)
+	(Remove subscriber) << Service >>
+	(Modify attendance) --> (Remove subscriber)
+	(Add subscriber) --> Attendee_Store
+	(Remove subscriber) --> Attendee_Store
+	(Event publisher) << Daemon >>
+	(Event publisher) --> (Notification)
+	(Event publisher) <--> Event_Store
+
+	' Event_Creator interactions
+	(Add event) << Service >>
+	(Modify event) --> (Add event)
+	(Remove event) << Service >>
+	(Modify event) --> (Remove event)
+	(Update event) << Service >>
+	(Modify event) --> (Update event)
+	(Add event) --> Event_Store
+	(Remove event) --> Event_Store
+	(Update event) --> Event_Store
+}
+
+@enduml
